@@ -1,0 +1,25 @@
+.stApp {
+  background:#0f172a;
+  color:white;
+  font-family: Segoe UI, sans-serif;
+}
+
+h1,h2,h3 { color:#93c5fd; }
+
+[data-testid="stSidebar"] {
+  background:#020617;
+}
+[data-testid="stSidebar"] * { color:white!important; }
+
+.card {
+  background:#020617;
+  padding:1.2em;
+  border-radius:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);
+}
+
+.stButton>button {
+  background:#2563eb;
+  color:white;
+  border-radius:10px;
+}
