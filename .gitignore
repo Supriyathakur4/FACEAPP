@@ -1,12 +1,5 @@
-# Virtual environment
 venv/
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Generated files
+dataset/
 attendance.csv
-
-# OS files
+__pycache__/
 .DS_Store
