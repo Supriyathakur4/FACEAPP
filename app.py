@@ -1,33 +1,34 @@
+from train_ui import train_model_ui
+from capture_faces import capture_faces_ui
+from student_ui import student_registration_ui
 import cv2
 import streamlit as st
 import numpy as np
 import pandas as pd
 from datetime import datetime
 import os
-def load_css():
-    with open("styles/style.css") as f:
+
+# ---------------- THEME CSS ----------------
+def load_css(theme):
+    css_file = "styles/dark.css" if theme == "Dark" else "styles/light.css"
+    with open(css_file) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-load_css()
-
 
 # ---------------- CONFIG ----------------
 FACE_SIZE = (200, 200)
-CONF_THRESHOLD = 70
-MIN_CONFIDENCE_PERCENT = 60
+CONF_THRESHOLD = 90
+MIN_CONFIDENCE_PERCENT = 35
 
-# ID → Name mapping
 id_name = {
     1: "Supriya",
     2: "Pushkar",
     3: "Bhavyaan",
-    4: "Alisha",
+    4: "Jatin",
     5: "Raghav",
     6: "Pratham",
-    7: "Jatin"
+    7: "Shiva"
 }
 
-# ---------------- LOAD MODELS ----------------
 recognizer = cv2.face.LBPHFaceRecognizer_create()
 recognizer.read("trainer.yml")
 
@@ -39,100 +40,116 @@ face_cascade = cv2.CascadeClassifier(
 st.set_page_config(page_title="FaceApp", layout="wide")
 st.title("🎓 FaceApp – Smart Attendance System")
 
-col1, col2 = st.columns(2)
-start = col1.button("▶ Start Camera")
-stop = col2.button("⏹ Stop Camera")
+theme = st.sidebar.selectbox("🎨 Select Theme", ["Light", "Dark"])
+load_css(theme)
 
-FRAME_WINDOW = st.image([])
+# -------- Sidebar Navigation --------
+page = st.sidebar.radio(
+    "Navigate",
+    ["📷 Attendance", "👤 Student Registration", "📸 Capture Faces", "🧠 Train Model"]
+)
 
-# ---------------- ATTENDANCE FILE ----------------
-today = datetime.now().strftime("%Y-%m-%d")
-attendance_file = f"attendance_{today}.csv"
+# ================= ATTENDANCE PAGE =================
+if page == "📷 Attendance":
+    col1, col2 = st.columns(2)
+    start = col1.button("▶ Start Camera")
+    stop = col2.button("⏹ Stop Camera")
+    snapshot_btn = st.button("📸 Take Snapshot")
 
-if not os.path.exists(attendance_file):
-    pd.DataFrame(columns=["Name", "Time", "Confidence"]).to_csv(attendance_file, index=False)
+    FRAME_WINDOW = st.image([])
 
-attendance_df = pd.read_csv(attendance_file)
-marked_names = set(attendance_df["Name"].tolist())
+    today = datetime.now().strftime("%Y-%m-%d")
+    attendance_file = f"attendance_{today}.csv"
 
-unknown_count = 0
+    if not os.path.exists(attendance_file):
+        pd.DataFrame(columns=["Name", "Time", "Confidence"]).to_csv(attendance_file, index=False)
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.header("📊 Live Dashboard")
-st.sidebar.write(f"📅 Date: {today}")
-st.sidebar.write(f"👥 Trained students: {len(id_name)}")
-st.sidebar.write(f"✅ Marked today: {len(marked_names)}")
+    attendance_df = pd.read_csv(attendance_file)
+    marked_names = set(attendance_df["Name"].tolist())
+    unknown_count = 0
 
-# ---------------- CAMERA ----------------
-cap = cv2.VideoCapture(0)
-run = start and not stop
+    st.sidebar.header("Live Dashboard")
+    st.sidebar.write(f"Date: {today}")
+    st.sidebar.write(f" Trained students: {len(id_name)}")
+    st.sidebar.write(f"Marked today: {len(marked_names)}")
 
-if run:
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    cap = cv2.VideoCapture(0)
+    run = start and not stop
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    if run:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-        for (x, y, w, h) in faces:
-            face = gray[y:y+h, x:x+w]
-            face = cv2.resize(face, FACE_SIZE)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-            id_, conf = recognizer.predict(face)
-            confidence_percent = max(0, int(100 - conf))
+            for (x, y, w, h) in faces:
+                face = gray[y:y+h, x:x+w]
+                face = cv2.resize(face, FACE_SIZE)
 
-            if conf < CONF_THRESHOLD and confidence_percent >= MIN_CONFIDENCE_PERCENT:
-                name = id_name.get(id_, "Unknown")
+                id_, conf = recognizer.predict(face)
+                confidence_percent = max(0, int(100 - conf))
 
-                if name not in marked_names:
-                    time_now = datetime.now().strftime("%H:%M:%S")
-                    pd.DataFrame([[name, time_now, confidence_percent]],
-                                 columns=["Name", "Time", "Confidence"]) \
-                        .to_csv(attendance_file, mode="a", header=False, index=False)
-                    marked_names.add(name)
+                if conf < CONF_THRESHOLD and confidence_percent >= MIN_CONFIDENCE_PERCENT:
+                    name = id_name.get(id_, "Unknown")
 
-                label = f"{name} ({confidence_percent}%)"
-                color = (0, 255, 0)
-            else:
-                label = "Unknown"
-                color = (0, 0, 255)
-                unknown_count += 1
+                    if name not in marked_names:
+                        time_now = datetime.now().strftime("%H:%M:%S")
+                        pd.DataFrame([[name, time_now, confidence_percent]],
+                                     columns=["Name", "Time", "Confidence"]) \
+                            .to_csv(attendance_file, mode="a", header=False, index=False)
+                        marked_names.add(name)
 
-            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-            cv2.putText(frame, label, (x, y-10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+                    label = f"{name} ({confidence_percent}%)"
+                    color = (0, 255, 0)
+                else:
+                    label = "Unknown"
+                    color = (0, 0, 255)
+                    unknown_count += 1
 
-        FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
+                cv2.putText(frame, label, (x, y-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
-else:
-    cap.release()
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            FRAME_WINDOW.image(rgb_frame)
 
-# ---------------- SUMMARY ----------------
-st.markdown("---")
-st.subheader("📊 Attendance Summary")
+            if snapshot_btn:
+                if not os.path.exists("snapshots"):
+                    os.makedirs("snapshots")
+                filename = f"snapshots/snap_{datetime.now().strftime('%H%M%S')}.png"
+                cv2.imwrite(filename, frame)
+                st.success(f"Snapshot saved: {filename}")
+    else:
+        cap.release()
 
-df = pd.read_csv(attendance_file)
-st.write(f"✅ Total Present: {df['Name'].nunique()}")
-st.write(f"❓ Unknown Faces Detected: {unknown_count}")
+    st.markdown("---")
+    st.subheader("📋 Attendance Records")
+    df = pd.read_csv(attendance_file)
+    st.dataframe(df)
 
-if not df.empty:
-    st.write(f"⏰ First Entry: {df.iloc[0]['Time']}")
-    st.write(f"⏰ Last Entry: {df.iloc[-1]['Time']}")
+    st.subheader("📈 Attendance Visualization")
+    if not df.empty:
+        chart_data = df["Name"].value_counts().reset_index()
+        chart_data.columns = ["Name", "Count"]
+        st.bar_chart(chart_data.set_index("Name"))
 
-# ---------------- DOWNLOAD ----------------
-st.markdown("---")
-st.subheader("📥 Download Attendance")
+    st.subheader("🏆 Student Attendance Ranking")
+    if not df.empty:
+        ranking = df["Name"].value_counts().reset_index()
+        ranking.columns = ["Name", "Attendance Count"]
+        ranking["Rank"] = ranking["Attendance Count"].rank(ascending=False).astype(int)
+        ranking = ranking.sort_values("Rank")
+        st.table(ranking)
 
-with open(attendance_file, "rb") as f:
-    st.download_button(
-        "⬇ Download Attendance CSV",
-        f,
-        file_name=attendance_file,
-        mime="text/csv"
-    )
+# ================= OTHER PAGES =================
+elif page == "👤 Student Registration":
+    student_registration_ui()
 
-# ---------------- TABLE ----------------
-st.subheader("📋 Attendance Records")
-st.dataframe(df)
+elif page == "📸 Capture Faces":
+    capture_faces_ui()
+
+elif page == "🧠 Train Model":
+    train_model_ui()
