@@ -1,12 +1,21 @@
 from train_ui import train_model_ui
 from capture_faces import capture_faces_ui
 from student_ui import student_registration_ui
+from report_ui import attendance_report_ui
+from login_ui import login_ui
+from firebase_config import db
+
 import cv2
 import streamlit as st
 import numpy as np
 import pandas as pd
 from datetime import datetime
 import os
+
+# -------- LOGIN CHECK --------
+if "user" not in st.session_state:
+    login_ui()
+    st.stop()
 
 # ---------------- THEME CSS ----------------
 def load_css(theme):
@@ -38,40 +47,32 @@ face_cascade = cv2.CascadeClassifier(
 
 # ---------------- STREAMLIT UI ----------------
 st.set_page_config(page_title="FaceApp", layout="wide")
-st.title("🎓 FaceApp – Smart Attendance System")
+st.title("FaceApp - Smart Attendance System")
 
-theme = st.sidebar.selectbox("🎨 Select Theme", ["Light", "Dark"])
+theme = st.sidebar.selectbox("Select Theme", ["Light", "Dark"])
 load_css(theme)
 
-# -------- Sidebar Navigation --------
 page = st.sidebar.radio(
     "Navigate",
-    ["📷 Attendance", "👤 Student Registration", "📸 Capture Faces", "🧠 Train Model"]
+    [
+        "Attendance",
+        "Student Registration",
+        "Capture Faces",
+        "Train Model",
+        "Attendance Report"
+    ]
 )
 
 # ================= ATTENDANCE PAGE =================
-if page == "📷 Attendance":
+if page == "Attendance":
     col1, col2 = st.columns(2)
-    start = col1.button("▶ Start Camera")
-    stop = col2.button("⏹ Stop Camera")
-    snapshot_btn = st.button("📸 Take Snapshot")
+    start = col1.button("Start Camera")
+    stop = col2.button("Stop Camera")
 
     FRAME_WINDOW = st.image([])
 
     today = datetime.now().strftime("%Y-%m-%d")
-    attendance_file = f"attendance_{today}.csv"
-
-    if not os.path.exists(attendance_file):
-        pd.DataFrame(columns=["Name", "Time", "Confidence"]).to_csv(attendance_file, index=False)
-
-    attendance_df = pd.read_csv(attendance_file)
-    marked_names = set(attendance_df["Name"].tolist())
-    unknown_count = 0
-
-    st.sidebar.header("Live Dashboard")
-    st.sidebar.write(f"Date: {today}")
-    st.sidebar.write(f" Trained students: {len(id_name)}")
-    st.sidebar.write(f"Marked today: {len(marked_names)}")
+    marked_names = set()
 
     cap = cv2.VideoCapture(0)
     run = start and not stop
@@ -97,9 +98,15 @@ if page == "📷 Attendance":
 
                     if name not in marked_names:
                         time_now = datetime.now().strftime("%H:%M:%S")
-                        pd.DataFrame([[name, time_now, confidence_percent]],
-                                     columns=["Name", "Time", "Confidence"]) \
-                            .to_csv(attendance_file, mode="a", header=False, index=False)
+
+                        # ✅ SAVE TO FIREBASE DB
+                        db.child("attendance").push({
+                            "name": name,
+                            "time": time_now,
+                            "confidence": confidence_percent,
+                            "date": today
+                        })
+
                         marked_names.add(name)
 
                     label = f"{name} ({confidence_percent}%)"
@@ -107,7 +114,6 @@ if page == "📷 Attendance":
                 else:
                     label = "Unknown"
                     color = (0, 0, 255)
-                    unknown_count += 1
 
                 cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
                 cv2.putText(frame, label, (x, y-10),
@@ -115,41 +121,18 @@ if page == "📷 Attendance":
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             FRAME_WINDOW.image(rgb_frame)
-
-            if snapshot_btn:
-                if not os.path.exists("snapshots"):
-                    os.makedirs("snapshots")
-                filename = f"snapshots/snap_{datetime.now().strftime('%H%M%S')}.png"
-                cv2.imwrite(filename, frame)
-                st.success(f"Snapshot saved: {filename}")
     else:
         cap.release()
 
-    st.markdown("---")
-    st.subheader("📋 Attendance Records")
-    df = pd.read_csv(attendance_file)
-    st.dataframe(df)
-
-    st.subheader("📈 Attendance Visualization")
-    if not df.empty:
-        chart_data = df["Name"].value_counts().reset_index()
-        chart_data.columns = ["Name", "Count"]
-        st.bar_chart(chart_data.set_index("Name"))
-
-    st.subheader("🏆 Student Attendance Ranking")
-    if not df.empty:
-        ranking = df["Name"].value_counts().reset_index()
-        ranking.columns = ["Name", "Attendance Count"]
-        ranking["Rank"] = ranking["Attendance Count"].rank(ascending=False).astype(int)
-        ranking = ranking.sort_values("Rank")
-        st.table(ranking)
-
 # ================= OTHER PAGES =================
-elif page == "👤 Student Registration":
+elif page == "Student Registration":
     student_registration_ui()
 
-elif page == "📸 Capture Faces":
+elif page == "Capture Faces":
     capture_faces_ui()
 
-elif page == "🧠 Train Model":
+elif page == "Train Model":
     train_model_ui()
+
+elif page == "Attendance Report":
+    attendance_report_ui()
