@@ -6,7 +6,7 @@ import time
 FACE_SIZE = (200, 200)
 
 def capture_faces_ui():
-    st.title("📸 Face Dataset Capture")
+    st.title("Face Dataset Capture")
 
     user_id = st.text_input("Enter Numeric User ID")
     start = st.button("Start Capturing")

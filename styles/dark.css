@@ -1,25 +1,62 @@
+/* App background */
 .stApp {
-  background:#0f172a;
-  color:white;
-  font-family: Segoe UI, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: "Segoe UI", sans-serif;
 }
 
-h1,h2,h3 { color:#93c5fd; }
+/* Headings */
+h1, h2, h3 {
+  color: #93c5fd;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
 
+/* Sidebar */
 [data-testid="stSidebar"] {
-  background:#020617;
+  background: #020617;
 }
-[data-testid="stSidebar"] * { color:white!important; }
+[data-testid="stSidebar"] * {
+  color: white !important;
+}
 
+/* Card container */
 .card {
-  background:#020617;
-  padding:1.2em;
-  border-radius:14px;
-  box-shadow:0 6px 18px rgba(0,0,0,.5);
+  background: #0b1220;
+  padding: 1.4em;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  margin-bottom: 1.2em;
 }
 
-.stButton>button {
-  background:#2563eb;
-  color:white;
-  border-radius:10px;
+/* Buttons */
+.stButton > button {
+  background: #2563eb;
+  color: white;
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 0.6em 1.2em;
+  border: none;
+  transition: all 0.2s ease-in-out;
 }
+.stButton > button:hover {
+  background: #1d4ed8;
+  transform: translateY(-2px);
+}
+
+/* DataFrames / tables */
+.stDataFrame {
+  background: #0b1220;
+  border-radius: 12px;
+  padding: 8px;
+  color: white;
+}
+
+/* Inputs */
+input, textarea {
+  border-radius: 8px !important;
+  background-color: #1e293b !important;
+  color: white !important;
+  border: 1px solid #334155 !important;
+}
+
