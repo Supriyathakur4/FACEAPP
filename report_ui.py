@@ -1,48 +1,45 @@
 import streamlit as st
-import pandas as pd
-from firebase_config import db
+import pyrebase
 
-def attendance_report_ui():
-    st.title("Attendance Dashboard")
+def get_auth():
+    firebase_config = {
+        "apiKey": st.secrets["apiKey"],
+        "authDomain": st.secrets["authDomain"],
+        "databaseURL": st.secrets["databaseURL"],
+        "projectId": st.secrets["projectId"],
+        "storageBucket": st.secrets["storageBucket"],
+        "messagingSenderId": st.secrets["messagingSenderId"],
+        "appId": st.secrets["appId"],
+    }
+    firebase = pyrebase.initialize_app(firebase_config)
+    return firebase.auth()
 
-    try:
-        data = db.child("attendance").get()
-    except:
-        st.warning("No attendance data yet. Mark attendance first.")
-        return
 
-    if not data.each():
-        st.warning("No attendance records found.")
-        return
+def login_ui():
+    st.title("Login")
 
-    records = []
+    choice = st.selectbox("Login / Signup", ["Login", "Signup"])
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
 
-    for item in data.each():
-        val = item.val()
-        records.append([
-            val.get("name"),
-            val.get("date"),
-            val.get("time"),
-            val.get("confidence")
-        ])
+    auth = get_auth()
 
-    df = pd.DataFrame(records, columns=["Name", "Date", "Time", "Confidence"])
+    if choice == "Signup":
+        if st.button("Create Account"):
+            try:
+                auth.create_user_with_email_and_password(email, password)
+                st.success("Account created. Please login.")
+            except Exception as e:
+                st.error(e)
 
-    st.subheader("Overall Stats")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Records", len(df))
-    col2.metric("Total Students", df["Name"].nunique())
-    col3.metric("Total Days", df["Date"].nunique())
+    if choice == "Login":
+        if st.button("Login"):
+            try:
+                user = auth.sign_in_with_email_and_password(email, password)
+                st.session_state["user"] = user
+                st.success("Logged in successfully")
+                st.rerun()
+            except Exception as e:
+                st.error(e)
 
-    st.markdown("---")
-
-    students = df["Name"].unique()
-    selected_student = st.selectbox("Select Student Profile", students)
-
-    student_df = df[df["Name"] == selected_student]
-
-    st.subheader(f"Profile: {selected_student}")
-    st.metric("Days Present", student_df["Date"].nunique())
-    st.metric("Total Entries", len(student_df))
-    st.dataframe(student_df.sort_values("Date", ascending=False))
 
