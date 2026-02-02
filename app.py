@@ -8,6 +8,9 @@ from firebase_config import db
 import cv2
 import streamlit as st
 from datetime import datetime
+from PIL import Image
+import numpy as np
+
 
 # -------- LOGIN CHECK --------
 if "user" not in st.session_state:
@@ -70,65 +73,51 @@ face_cascade = cv2.CascadeClassifier(
 
 
 # ================= ATTENDANCE =================
+import numpy as np
+from PIL import Image
+
 if page == "Attendance":
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("Live Attendance")
+    st.subheader("Mark Attendance")
 
-    col1, col2 = st.columns(2)
-    start = col1.button("Start Camera")
-    stop = col2.button("Stop Camera")
+    img_file = st.camera_input("Take a photo")
 
-    FRAME_WINDOW = st.image([])
-    today = datetime.now().strftime("%Y-%m-%d")
-    marked_names = set()
+    if img_file is not None:
+        image = Image.open(img_file)
+        frame = np.array(image)
 
-    cap = cv2.VideoCapture(0)
-    run = start and not stop
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-    if run:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+        for (x, y, w, h) in faces:
+            face = gray[y:y+h, x:x+w]
+            face = cv2.resize(face, FACE_SIZE)
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+            id_, conf = recognizer.predict(face)
+            confidence_percent = max(0, int(100 - conf))
 
-            for (x, y, w, h) in faces:
-                face = gray[y:y+h, x:x+w]
-                face = cv2.resize(face, FACE_SIZE)
+            if conf < CONF_THRESHOLD and confidence_percent >= MIN_CONFIDENCE_PERCENT:
+                name = id_name.get(id_, "Unknown")
 
-                id_, conf = recognizer.predict(face)
-                confidence_percent = max(0, int(100 - conf))
+                time_now = datetime.now().strftime("%H:%M:%S")
+                today = datetime.now().strftime("%Y-%m-%d")
 
-                if conf < CONF_THRESHOLD and confidence_percent >= MIN_CONFIDENCE_PERCENT:
-                    name = id_name.get(id_, "Unknown")
+                db.child("attendance").push({
+                    "name": name,
+                    "time": time_now,
+                    "confidence": confidence_percent,
+                    "date": today
+                })
 
-                    if name not in marked_names:
-                        time_now = datetime.now().strftime("%H:%M:%S")
-                        db.child("attendance").push({
-                            "name": name,
-                            "time": time_now,
-                            "confidence": confidence_percent,
-                            "date": today
-                        })
-                        marked_names.add(name)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0,255,0), 2)
+                cv2.putText(frame, name, (x, y-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
 
-                    label = f"{name} ({confidence_percent}%)"
-                    color = (0, 255, 0)
-                else:
-                    label = "Unknown"
-                    color = (0, 0, 255)
+                st.success(f"Attendance marked for {name}")
+            else:
+                st.error("Face not recognized")
 
-                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-                cv2.putText(frame, label, (x, y-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+        st.image(frame)
 
-            FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    else:
-        cap.release()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ================= OTHER PAGES =================
